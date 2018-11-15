@@ -1,6 +1,44 @@
 'use strict';
 
-var _grid
+//============Animación del título==========
+//Decr: Cambia el color del título a blanco
+function titleAnimationWhite(){
+    $('.main-titulo').switchClass('main-titulo', 'main-titulo-2', 700, 'swing', function(){
+        titleAnimationYellow();
+    });
+}
+
+//Decr: Cambia el color del título a amarillo
+function titleAnimationYellow(){
+    $('.main-titulo-2').switchClass('main-titulo-2', 'main-titulo', 900, 'swing', function(){
+        titleAnimationWhite();
+    });
+}
+//==========Fin Animación del título========
+
+//============Animaciones de movimiento de ficha==========
+function moveCandyDownAnimation(p_candy){
+    $(p_candy).slideDown('slow');
+}
+//==========Fin Animaciones de movimiento de ficha========
+
+//============Animaciones de desaparición de dulce==========
+//Descr: Inicia la animación que muestra la aliminación de un dulce.
+function startRemoveCandyAnimation(p_candy){
+    var w_candyObj = $(p_candy);
+    removeCandyAnimationToggle(w_candyObj, 0, 4);    
+}
+
+//Descr: Cambia la visibilidad de un dulce
+function removeCandyAnimationToggle(p_candyObj, p_count, p_max){
+    p_candyObj.fadeToggle(100, 'linear', function(){
+        if(p_count >= p_max)
+            return;
+        p_count++;
+        removeCandyAnimationToggle(p_candyObj, p_count, p_max);
+    });
+}
+//==========Fin Animaciones de desaparición de dulce========
 
 //Decr: Devuelve un entero entre 0 y p_max - 1.
 //p_max => Límite máximo
@@ -46,7 +84,9 @@ function initGrid(){
     var w_maxCol = 7, w_maxRow = 7, w_col = 0, w_row = 0;
     var w_candy = null, w_colDOM = null;
     var w_id = '';
+    var w_rowArray = [];
 
+    clearGrid();
     for(var w_col = 1; w_col <= w_maxCol; w_col++){        
         for(var w_row = 1; w_row <= w_maxRow; w_row++){
             w_candy = generateCandy();
@@ -57,21 +97,36 @@ function initGrid(){
 
             w_colDOM = getColumn(w_col);
             w_colDOM.append(w_candy);
-        }        
+        }   
     }
 }
 
-//Busca combinaciones válidas y asigna los puntos
+//Descr: Limpia la grilla
+function clearGrid(){
+    $('div[class^="col-"').html('');
+    _grid = [];
+}
+
+//Decr: Busca combinaciones válidas y asigna los puntos
 function searchCombinations() {
 
 }
 
 //Descr: Inicia o reinicia el juego
-function startGame(){
-    $('.btn-reinicio').html('Reiniciar');
-    initGrid();
+function startGame(){    
+    try{
+        $('.btn-reinicio').html('Reiniciar');
+        initGrid();
+
+        //Test
+        //startRemoveCandyAnimation('#candy-C5R1');        
+        //moveCandyDownAnimation('#candy-C5R1');
+    }catch(ex){
+        alert(ex.message);
+    }
 }
 
 $(document).ready(function(){
-    $('.btn-reinicio').bind('click', startGame());
+    titleAnimationWhite();   
+    $('button.btn-reinicio').on('click', function() { startGame(); }); 
 });

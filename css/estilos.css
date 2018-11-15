@@ -26,6 +26,13 @@ body{
   width: 100%;
 }
 
+.main-titulo-2{
+  font-family: gameFont;
+  font-size: 3em;
+  color: #FFFFFF;
+  width: 100%;
+}
+
 .panel-tablero{
   width: 70%;
   border: 10px solid #E87306;
