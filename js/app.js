@@ -104,7 +104,6 @@ function initGrid(){
 //Descr: Limpia la grilla
 function clearGrid(){
     $('div[class^="col-"').html('');
-    _grid = [];
 }
 
 //Decr: Busca combinaciones válidas y asigna los puntos
