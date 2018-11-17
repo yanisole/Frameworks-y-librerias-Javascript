@@ -34,7 +34,7 @@ function startRemoveCandyAnimation(p_candy){
     if(p_candy.is(':animated'))
         return;
     _onFadeToggleAnimation.push(getCandyId(p_candy));
-    removeCandyAnimationToggle(p_candy, 0, 4);    
+    removeCandyAnimationToggle(p_candy, 0, 2);    
 }
 
 //Descr: Cambia la visibilidad de un dulce
@@ -58,7 +58,7 @@ function removeCandyAnimationToggle(p_candyObj, p_count, p_max){
 //Descr: Busca y elimina combinaciones. Además devuleve un bool
 //que dice si hubo al menos una combinación
 function scanCombinations(){
-    var w_col = 0, w_row = 0, w_value = 0, w_horizontalSize = 0, w_verticalSize = 0;
+    var w_col = 0, w_row = 0, w_value = 0, w_horizontalSize = 0, w_verticalSize = 0, w_combinationSize = 0;
     var w_countLeft = 0, w_countRight = 0, w_countUp = 0, w_countDown = 0;
     var w_existCombination = false;
     var w_candy = null;
@@ -86,11 +86,14 @@ function scanCombinations(){
                     removeVerticalCombination(w_col, w_row, w_countUp, w_countDown);
 
                 //Dulce actual
+                w_combinationSize = w_verticalSize + w_horizontalSize;
                 if(Math.max(w_verticalSize, w_horizontalSize) >= _minCombinationSize){
                     _searchCombination = true;
                     w_candy = getCandy(w_col, w_row);
                     startRemoveCandyAnimation(w_candy);
-                }
+
+                    calculatePoints(w_combinationSize);
+                }                
             }
         }
     }catch(ex){
@@ -213,6 +216,17 @@ function removeVerticalCombination(p_startColumn, p_startRow, p_offsetUp, p_offs
         w_offset--;
     }
 }
+
+//Descr: Se calculan los puntos obtenidos por la combinación
+//Se usa una fórmula secilla. 
+function calculatePoints(p_combinationSize){
+    var w_minPoints = 100;
+    var w_rem = Math.ceil(p_combinationSize / _minCombinationSize);
+    var w_points = w_minPoints * w_rem;
+    var w_score = Number($('#score-text').html()) + w_points;
+
+    $('#score-text').html(w_score);
+}
 //==========Fin Combinaciones de dulces========
 
 //Decr: Devuelve un entero entre 0 y p_max - 1.
@@ -334,12 +348,9 @@ function clearGrid(){
 function startGame(){    
     try{
         $('.btn-reinicio').html('Reiniciar');
-        initGrid();
-        
-
-        //Test        
-        //startRemoveCandyAnimation('#candy-C5R1');        
-        //moveCandyDownAnimation('#candy-C5R1');
+        $('#score-text').html(0);
+        $('#movimientos-text').html(0);
+        initGrid();  
     }catch(ex){
         alert(ex.message);
     }
@@ -349,7 +360,7 @@ $(document).ready(function(){
     try{
         titleAnimationWhite();   
         $('button.btn-reinicio').on('click', function() { startGame(); }); 
-        //test
+        //Test
         $('#btn-scan').on('click', function() { scanCombinations(); });
     }catch(ex){
         alert(ex.message);
