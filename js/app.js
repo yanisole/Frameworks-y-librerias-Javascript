@@ -4,7 +4,7 @@ var _maxRows = 7, _maxColumns = 7, _minCombinationSize = 3;
 //Estas variables se usan para poder realizar el loop de validación de
 //combinaciones, recarga de dulces y repetir el ciclo hasta no 
 //encontrarse combinaciones.
-var _onFadeToggleAnimation = [], _searchCombination = false;
+var _onFadeToggleAnimation = {}, _searchCombination = false;
 
 //============Animación del título==========
 //Decr: Cambia el color del título a blanco
@@ -23,35 +23,87 @@ function titleAnimationYellow(){
 //==========Fin Animación del título========
 
 //============Animaciones de movimiento de ficha==========
-function moveCandyDownAnimation(p_candy){
+//Descr: Lanza un dulce nuevo a la grilla
+function dropCandyArray(p_array, p_columnObj){
+    var w_candy = null;
+
+    if(p_array.length == 0){
+        if(_searchCombination)
+            scanCombinations();
+        return;
+    }
+
+    w_candy = p_array.pop();
+    p_columnObj.prepend(w_candy);
     
+    w_candy.addClass('dulce');
+    w_candy.animate({
+        top: '+=96',
+        height: 'toogle'       
+    }, 
+    300,
+    function(){
+        w_candy.removeClass('dulce');
+        dropCandyArray(p_array, p_columnObj); 
+    });
 }
 //==========Fin Animaciones de movimiento de ficha========
 
 //============Animaciones de desaparición de dulce==========
-//Descr: Inicia la animación que muestra la aliminación de un dulce.
-function startRemoveCandyAnimation(p_candy){
-    if(p_candy.is(':animated'))
-        return;
-    _onFadeToggleAnimation.push(getCandyId(p_candy));
-    removeCandyAnimationToggle(p_candy, 0, 2);    
+
+function candyState(p_candy){ 
+    return {
+        row: Number(p_candy.attr('data-row')),
+        column: Number(p_candy.attr('data-col'))        
+    }
 }
 
+function removeCandyAnimation(p_array){
+    /*var w_object = {};
+    var w_candy = null;
+
+    if(p_array.length == 0)
+        return;
+    
+    w_object = p_array.pop();
+    w_candy = w_object.candy;
+    for(var i = 0)*/
+}
+
+//Descr: Inicia la animación que muestra la aliminación de un dulce.
+/*function startRemoveCandyAnimation(p_candy, p_column, p_row){
+    var w_data = null, w_id = '';
+
+    if(p_candy.is(':animated'))
+        return;
+    w_data = candyState(p_candy);
+    w_id = getCandyId(p_candy);
+    _onFadeToggleAnimation[w_id] = w_data;
+
+    removeCandyAnimationToggle(p_candy, 0, 2);    
+}*/
+
 //Descr: Cambia la visibilidad de un dulce
-function removeCandyAnimationToggle(p_candyObj, p_count, p_max){
+/*function removeCandyAnimationToggle(p_candyObj, p_count, p_max){
+    var w_id = '', w_idPrevius = '';
+    var w_candy = null;
+    var w_row = 0, w_col = 0;
+
     p_candyObj.fadeToggle(100, 'linear', function(){
-        if(p_count >= p_max){
-            _onFadeToggleAnimation = jQuery.grep(_onFadeToggleAnimation, function(value) { 
-                return value !== getCandyId(p_candyObj); 
-            });
-            if(_onFadeToggleAnimation.length == 0)
+        if(p_count >= p_max){           
+            w_id = getCandyId(p_candyObj); 
+            p_candyObj.remove();   
+            delete _onFadeToggleAnimation[w_id];
+
+            if(Object.keys(_onFadeToggleAnimation).length == 0){
                 refillGrid();
+            }
             return;
         }
         p_count++;
         removeCandyAnimationToggle(p_candyObj, p_count, p_max);
     });
-}
+}*/
 //==========Fin Animaciones de desaparición de dulce========
 
 //============Combinaciones de dulces==========
@@ -62,6 +114,7 @@ function scanCombinations(){
     var w_countLeft = 0, w_countRight = 0, w_countUp = 0, w_countDown = 0;
     var w_existCombination = false;
     var w_candy = null;
+    var w_array = [];
 
 
     try{
@@ -90,11 +143,16 @@ function scanCombinations(){
                 if(Math.max(w_verticalSize, w_horizontalSize) >= _minCombinationSize){
                     _searchCombination = true;
                     w_candy = getCandy(w_col, w_row);
-                    startRemoveCandyAnimation(w_candy);
+                    w_array.push(w_candy);
+                    //startRemoveCandyAnimation(w_candy, w_col, w_row);
 
                     calculatePoints(w_combinationSize);
                 }                
             }
+        }
+
+        if(w_array.length > 0){
+
         }
     }catch(ex){
         alert(ex.message);
@@ -303,40 +361,80 @@ function initGrid(){
 
     clearGrid();
     for(var w_col = 1; w_col <= _maxColumns; w_col++){        
-        for(var w_row = 1; w_row <= _maxRows; w_row++){
+        for(var w_row = _maxRows; w_row > 0; w_row--){
             w_candy = generateCandy();
 
             //Le asigno el id al dulce
             w_id = generateId(w_col, w_row);
-            w_candy.attr('id', w_id);
+            w_candy.attr({
+                'id': w_id,
+                'data-row': w_row,
+                'data-col': w_col
+            });
 
             w_colDOM = getColumn(w_col);
             w_colDOM.append(w_candy);
+             
         }   
     }
+    scanCombinations();
 }
 
 //Descr: Genera dulces para completar la grilla
 //en los espacios vacíos
 function refillGrid(){
-    var w_col = 0, w_row = 0;
+    var w_col = 0, w_row = 0, w_max = 0, w_offset = 0;
     var w_candy = null, w_colDOM = null;
-    var w_candyItem = '';
+    var w_candyItem = '', w_id = '';
+    var w_array = [];
+    
+    for(w_col = 1; w_col <= _maxColumns; w_col++){       
+        //Me fijo si se eliminaron dulces de esta columna 
+        w_colDOM = $('.col-' + w_col);
+        w_array = w_colDOM.find('img:visible');        
+        if(w_array.length == _maxRows)
+            continue;
 
-    for(w_col = _maxColumns; w_col > 0; w_col--){
-        for(w_row = _maxRows; w_row > 0; w_row--){
-            w_candy = getCandy(w_col, w_row);
-            if(w_candy.is(':visible'))
-                continue;
+        //Actualizo el estado de los elementos que quedan
+        w_array = $.makeArray(w_array).reverse();
+        w_row = _maxRows;
+        $.each(w_array, function(i, element){        
+            w_candy = $(element);
+            w_id = generateId(w_col, w_row);
+            w_candy.attr({
+                'id': w_id,
+                'data-row': w_row,
+                'data-col': w_col
+            });           
+            w_row--;
+        });
 
-            w_candyItem = generateCandyItem();
-            setCandy(w_candy, w_candyItem);
-            w_candy.show();
+        //Genero nuevos dulces
+        w_max = _maxRows - w_array.length;
+        w_offset = w_max;
+        w_array = [];
+        for(w_row = w_max; w_row > 0; w_row--){
+            w_candy = generateCandy();
+
+            //Le asigno el id al dulce
+            w_id = generateId(w_col, w_row);
+            w_candy.attr({
+                'id': w_id,
+                'data-row': w_row,
+                'data-col': w_col
+            });
+
+            w_colDOM = getColumn(w_col);
+            w_array.push(w_candy);            
+            w_offset--;
         }
+
+        w_array = w_array.reverse();
+        dropCandyArray(w_array, w_colDOM);
     }
 
-    if(_searchCombination)
-        scanCombinations();
+    /*if(_searchCombination)
+        scanCombinations();*/
 }
 
 //Descr: Limpia la grilla
