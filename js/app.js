@@ -1,6 +1,6 @@
 'use strict';
 
-var _maxRows = 7, _maxColumns = 7, _minCombinationSize = 3;
+var _maxRows = 7, _maxColumns = 7, _minCombinationSize = 3, _maxDistance = 30;
 //Estas variables se usan para poder realizar el loop de validación de
 //combinaciones, recarga de dulces y repetir el ciclo hasta no 
 //encontrarse combinaciones.
@@ -21,6 +21,212 @@ function titleAnimationYellow(){
     });
 }
 //==========Fin Animación del título========
+
+//============Drag Animación==========
+function addDragAnimation(p_candy){
+    var w_dragOffset = 10;
+    p_candy.draggable({
+        drag: function(event, ui){
+            onDragEvent(event, ui);
+        },
+        stop: function(event, ui){            
+            onDragStopEvent(event, ui);
+        }
+    }); 
+}
+
+function onDragEvent(p_event, p_ui){
+    var w_left = 0;
+
+    try{
+        //Una ficha solo puede moverse a la izquierda,
+        //a la derecha o hacia abajo.
+        if(p_ui.position.top < 0)
+            p_ui.position.top = 0;                
+
+        //Verifico si el movimiento es posible.
+        //Solo puedo moverme de forma vertical u horizontal, pero nunca
+        //en diagonal.
+        w_left = Math.abs(p_ui.position.left);
+        if(w_left > p_ui.position.top)
+            p_ui.position.top = 0;
+        else if(w_left <= p_ui.position.top)
+            p_ui.position.left = 0;
+            
+        if(w_left >= _maxDistance || p_ui.position.top >= _maxDistance){     
+            p_event.preventDefault();
+        }
+    }
+    catch(ex){
+        p_event.preventDefault();
+        alert(ex.message);
+    }
+}
+
+function onDragStopEvent(p_event, p_ui){
+    var w_candy = null, w_swap = null;
+    var w_candyCoord = null;
+    try{
+        w_candy = $(p_ui.helper)
+        w_candyCoord = candyState(w_candy);
+
+        //Verifico si el movimiento vertical
+        if(isVerticalMove(p_ui.originalPosition, p_ui.position)){
+            //Verifico si el movimiento es válido
+            if(canMoveVertical(w_candy))
+                swapDown(w_candy, w_candyCoord.column, w_candyCoord.row);
+            else
+                swapDownCancel(w_candy);
+        }else {
+            //Verifico si el movimiento es válido
+            if(!canMoveHorizontal(w_candy))                
+                return;
+            //Muevo el dulce hacia la izquierda
+            if(isLeftMove(p_ui.position)){
+                swapLeft(w_candy, w_candyCoord.column, w_candyCoord.row);
+            }
+        }
+    }catch(ex){
+        alert(ex.message);
+    }   
+}   
+
+function canMoveHorizontal(p_candy, p_column, p_row){
+    var w_left = scanLeft(p_column, p_row, p_candy);
+    var w_right = scanRight(p_column, p_row, p_candy);
+    var w_down = 0;
+
+    if(w_left.count + w_right.count + 1 >= _minCombinationSize)
+        return true;
+    
+    w_down = scanDown(p_row, p_column, p_candy);
+    return (w_down.count + 1 >= _minCombinationSize);
+}
+
+function canMoveLeft(p_candy, p_column, p_row){
+    var w_left = scanLeft(p_column - 1, p_row, p_candy);    
+    var w_down = 0;
+
+    if(w_left.count + w_right.count + 1 >= _minCombinationSize)
+        return true;
+    
+    w_down = scanDown(p_row, p_column, p_candy);
+    return (w_down.count + 1 >= _minCombinationSize);
+}
+
+function canMoveVertical(p_candy, p_row, p_row){
+    var w_down = scanDown(p_row, p_column, p_candy);
+    var w_left = 0, w_right = 0;
+
+    if(w_down.count + 1 >= _minCombinationSize)
+        return true;
+
+    w_left = scanLeft(p_column, p_row + 1, p_candy);
+    w_right = scanRight(p_column, p_row + 1, p_candy);
+    return (w_left.count + w_right.count + 1 >= _minCombinationSize)
+}
+
+function isVerticalMove(p_originalPosition, p_currentPosition){
+    return (p_currentPosition.top > p_originalPosition.top)
+}
+
+function isLeftMove(p_currentPosition){
+    return (p_currentPosition.left < 0);
+}
+
+function swap(p_fromCandy, p_toCandy, p_fromValue, p_toValue, p_horizontal){
+    p_fromCandy.addClass('dulce');
+    p_toCandy.addClass('dulce');
+
+    if(!p_horizontal){
+        p_fromCandy.animate({
+            top: p_fromValue      
+        }, 
+        300,
+        function(){
+            p_fromCandy.removeClass('dulce');
+        });
+
+        p_toCandy.addClass('dulce');
+        p_toCandy.animate({
+            top: p_toValue      
+        }, 
+        300,
+        function(){
+            p_toCandy.removeClass('dulce');
+        });
+
+        return;
+    }
+
+    p_fromCandy.animate({
+        left: p_fromValue      
+    }, 
+    300,
+    function(){
+        p_fromCandy.removeClass('dulce');
+    });
+
+    p_toCandy.addClass('dulce');
+    p_toCandy.animate({
+        letf: p_toValue      
+    }, 
+    300,
+    function(){
+        p_toCandy.removeClass('dulce');
+    });
+}
+
+function swapCancel(p_candy, p_value, p_horizontal){
+    p_candy.addClass('dulce');
+    if(!p_horizontal){
+        p_candy.animate({
+            top: p_value      
+        }, 
+        300,
+        function(){
+            p_candy.removeClass('dulce');        
+        });
+
+        return;
+    }
+
+    p_candy.animate({
+        left: p_value      
+    }, 
+    300,
+    function(){
+        p_candy.removeClass('dulce');        
+    });    
+}
+
+function swapDown(p_candy, p_column, p_row){
+    var w_nextCandy = getCandy(p_column, p_row + 1);
+    swap(p_candy, w_nextCandy, '+=' + (96 - _maxDistance), '-=96', false);
+}
+
+function swapDownCancel(p_candy){
+    swapCancel(p_candy, '-=' + _maxDistance, false);
+}
+
+function swapLeft(p_candy, p_column, p_row){
+    var w_nextCandy = getCandy(p_column - 1, p_row);
+    swap(p_candy, w_nextCandy, '-=' + (96 - _maxDistance), '+=96', true);
+}
+
+function swapLeftCancel(p_candy){
+    swapCancel(p_candy, '+=' + _maxDistance, false);
+}
+
+function swapRight(p_candy, p_column, p_row){
+    var w_nextCandy = getCandy(p_column + 1, p_row);
+    swap(p_candy, w_nextCandy, '+=' + (96 - _maxDistance), '-=96', true);
+}
+
+function swapRightCancel(p_candy){
+    swapCancel(p_candy, '-=' + _maxDistance, true);   
+}
+//==========Fin Drag Animación========
 
 //============Animaciones de movimiento de ficha==========
 //Descr: Lanza un dulce nuevo a la grilla
@@ -69,7 +275,7 @@ function startRemoveCandyAnimation(p_array){
         w_id = getCandyId(w_candy);
         _onFadeToggleAnimation[w_id] = w_candy;
        
-        removeCandyAnimationToggle(w_candy, 0, 2);
+        removeCandyAnimationToggle(w_candy, 0, 4);
     }    
 }
 
@@ -86,7 +292,7 @@ function removeCandyAnimationToggle(p_candyObj, p_count, p_max){
             delete _onFadeToggleAnimation[w_id];
 
             if(Object.keys(_onFadeToggleAnimation).length == 0){
-               setTimeout(function(){ refillGrid(); }, 1000);
+               setTimeout(function(){ refillGrid(); }, 500);
             }
             return;
         }
@@ -377,8 +583,12 @@ function initGrid(){
                 'data-col': w_col
             });
 
+            
             w_colDOM = getColumn(w_col);
             w_colDOM.append(w_candy);
+
+            addDragAnimation(w_candy);
+
              
         }   
     }
@@ -463,8 +673,6 @@ $(document).ready(function(){
     try{
         titleAnimationWhite();   
         $('button.btn-reinicio').on('click', function() { startGame(); }); 
-        //Test
-        $('#btn-scan').on('click', function() { scanCombinations(); });
     }catch(ex){
         alert(ex.message);
     }
