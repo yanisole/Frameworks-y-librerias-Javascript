@@ -1,9 +1,8 @@
 'use strict';
 
 var _maxRows = 7, _maxColumns = 7, _minCombinationSize = 3, _maxDistance = 30;
-//Estas variables se usan para poder realizar el loop de validación de
-//combinaciones, recarga de dulces y repetir el ciclo hasta no 
-//encontrarse combinaciones.
+var _combinationTimerId = 0, _refillTimerId = 0, _clockId = 0;; 
+var _lock = false, _lockDrop = false;
 var _onFadeToggleAnimation = {};
 
 //============Animación del título==========
@@ -22,285 +21,230 @@ function titleAnimationYellow(){
 }
 //==========Fin Animación del título========
 
-//============Drag Animación==========
-function addDragAnimation(p_candy){
-    var w_dragOffset = 10;
-    p_candy.draggable({
-        drag: function(event, ui){
-            onDragEvent(event, ui);
-        },
-        stop: function(event, ui){            
-            onDragStopEvent(event, ui);
-        }
-    }); 
-}
-
-function onDragEvent(p_event, p_ui){
-    var w_left = 0;
-
-    try{
-        //Una ficha solo puede moverse a la izquierda,
-        //a la derecha o hacia abajo.
-        if(p_ui.position.top < 0)
-            p_ui.position.top = 0;                
-
-        //Verifico si el movimiento es posible.
-        //Solo puedo moverme de forma vertical u horizontal, pero nunca
-        //en diagonal.
-        w_left = Math.abs(p_ui.position.left);
-        if(w_left > p_ui.position.top)
-            p_ui.position.top = 0;
-        else if(w_left <= p_ui.position.top)
-            p_ui.position.left = 0;
-            
-        if(w_left >= _maxDistance || p_ui.position.top >= _maxDistance){     
-            p_event.preventDefault();
-        }
-    }
-    catch(ex){
-        p_event.preventDefault();
-        alert(ex.message);
-    }
-}
-
-function onDragStopEvent(p_event, p_ui){
-    var w_candy = null, w_swap = null;
-    var w_candyCoord = null;
-    try{
-        w_candy = $(p_ui.helper)
-        w_candyCoord = candyState(w_candy);
-
-        //Verifico si el movimiento vertical
-        if(isVerticalMove(p_ui.originalPosition, p_ui.position)){
-            //Verifico si el movimiento es válido
-            if(canMoveVertical(w_candy))
-                swapDown(w_candy, w_candyCoord.column, w_candyCoord.row);
-            else
-                swapDownCancel(w_candy);
-        }else {
-            //Verifico si el movimiento es válido
-            if(!canMoveHorizontal(w_candy))                
-                return;
-            //Muevo el dulce hacia la izquierda
-            if(isLeftMove(p_ui.position)){
-                swapLeft(w_candy, w_candyCoord.column, w_candyCoord.row);
-            }
-        }
-    }catch(ex){
-        alert(ex.message);
-    }   
-}   
-
-function canMoveHorizontal(p_candy, p_column, p_row){
-    var w_left = scanLeft(p_column, p_row, p_candy);
-    var w_right = scanRight(p_column, p_row, p_candy);
-    var w_down = 0;
-
-    if(w_left.count + w_right.count + 1 >= _minCombinationSize)
-        return true;
-    
-    w_down = scanDown(p_row, p_column, p_candy);
-    return (w_down.count + 1 >= _minCombinationSize);
-}
-
-function canMoveLeft(p_candy, p_column, p_row){
-    var w_left = scanLeft(p_column - 1, p_row, p_candy);    
-    var w_down = 0;
-
-    if(w_left.count + w_right.count + 1 >= _minCombinationSize)
-        return true;
-    
-    w_down = scanDown(p_row, p_column, p_candy);
-    return (w_down.count + 1 >= _minCombinationSize);
-}
-
-function canMoveVertical(p_candy, p_row, p_row){
-    var w_down = scanDown(p_row, p_column, p_candy);
-    var w_left = 0, w_right = 0;
-
-    if(w_down.count + 1 >= _minCombinationSize)
-        return true;
-
-    w_left = scanLeft(p_column, p_row + 1, p_candy);
-    w_right = scanRight(p_column, p_row + 1, p_candy);
-    return (w_left.count + w_right.count + 1 >= _minCombinationSize)
-}
-
-function isVerticalMove(p_originalPosition, p_currentPosition){
-    return (p_currentPosition.top > p_originalPosition.top)
-}
-
-function isLeftMove(p_currentPosition){
-    return (p_currentPosition.left < 0);
-}
-
-function swap(p_fromCandy, p_toCandy, p_fromValue, p_toValue, p_horizontal){
-    p_fromCandy.addClass('dulce');
-    p_toCandy.addClass('dulce');
-
-    if(!p_horizontal){
-        p_fromCandy.animate({
-            top: p_fromValue      
-        }, 
-        300,
-        function(){
-            p_fromCandy.removeClass('dulce');
-        });
-
-        p_toCandy.addClass('dulce');
-        p_toCandy.animate({
-            top: p_toValue      
-        }, 
-        300,
-        function(){
-            p_toCandy.removeClass('dulce');
-        });
-
-        return;
-    }
-
-    p_fromCandy.animate({
-        left: p_fromValue      
-    }, 
-    300,
-    function(){
-        p_fromCandy.removeClass('dulce');
-    });
-
-    p_toCandy.addClass('dulce');
-    p_toCandy.animate({
-        letf: p_toValue      
-    }, 
-    300,
-    function(){
-        p_toCandy.removeClass('dulce');
-    });
-}
-
-function swapCancel(p_candy, p_value, p_horizontal){
-    p_candy.addClass('dulce');
-    if(!p_horizontal){
-        p_candy.animate({
-            top: p_value      
-        }, 
-        300,
-        function(){
-            p_candy.removeClass('dulce');        
-        });
-
-        return;
-    }
-
-    p_candy.animate({
-        left: p_value      
-    }, 
-    300,
-    function(){
-        p_candy.removeClass('dulce');        
-    });    
-}
-
-function swapDown(p_candy, p_column, p_row){
-    var w_nextCandy = getCandy(p_column, p_row + 1);
-    swap(p_candy, w_nextCandy, '+=' + (96 - _maxDistance), '-=96', false);
-}
-
-function swapDownCancel(p_candy){
-    swapCancel(p_candy, '-=' + _maxDistance, false);
-}
-
-function swapLeft(p_candy, p_column, p_row){
-    var w_nextCandy = getCandy(p_column - 1, p_row);
-    swap(p_candy, w_nextCandy, '-=' + (96 - _maxDistance), '+=96', true);
-}
-
-function swapLeftCancel(p_candy){
-    swapCancel(p_candy, '+=' + _maxDistance, false);
-}
-
-function swapRight(p_candy, p_column, p_row){
-    var w_nextCandy = getCandy(p_column + 1, p_row);
-    swap(p_candy, w_nextCandy, '+=' + (96 - _maxDistance), '-=96', true);
-}
-
-function swapRightCancel(p_candy){
-    swapCancel(p_candy, '-=' + _maxDistance, true);   
-}
-//==========Fin Drag Animación========
-
 //============Animaciones de movimiento de ficha==========
 //Descr: Lanza un dulce nuevo a la grilla
-function dropCandyArray(p_array, p_columnObj){
-    var w_candy = null;
-
+function dropCandyArray(p_array){
+    var w_candy = null, w_data = null, w_arrayImg = null;
+    var w_columnElement = null;
+    var w_row = 0;
+    var w_id = 0;
+    
     if(p_array.length == 0)
         return;
     
     w_candy = p_array.pop();
-    p_columnObj.prepend(w_candy);
-    
-    w_candy.addClass('dulce');
+    w_data = getCandyData(w_candy);    
+    w_candy.show();
+    w_columnElement = getColumn(w_data.column);
+    w_columnElement.prepend(w_candy);
+        
+    w_candy.addClass('dulce');    
+    w_candy.css('top', '-' + (w_data.row * 112) + 'px');
     w_candy.animate({
-        top: '+=96',
+        top:  '+=96',
         height: 'toogle'       
     }, 
-    300,
+    100,
     function(){
         w_candy.removeClass('dulce');
-        dropCandyArray(p_array, p_columnObj); 
+        w_candy.css('top', '');    
+        
+        dropCandyArray(p_array, w_columnElement); 
+        if(p_array.length === 0){
+            //Actualizo los datos de los dulces
+            refreshGridData();
+            _lock = false;
+        }
     });
 }
 //==========Fin Animaciones de movimiento de ficha========
 
-//============Animaciones de desaparición de dulce==========
+//==========Dulces========
+//Descr: Genera un dulce. Valores posibles:
+//1.png, 2.png, 3.png, 4.png
+function generateCandyElement(){    
+    var w_candy = generateCandy();
+    var w_src = 'image/' + w_candy;
+    return $('<img />').attr({
+        'src': w_src,
+        'class': 'elemento',
+        'data-candy': w_candy
+    });
+}
 
-function candyState(p_candy){ 
+//Decsr: Genera un dulce. Valores posibles:
+//1.png, 2.png, 3.png, 4.png
+function generateCandy(){
+    var w_idx = rollDice(4) + 1;
+    return String(w_idx) + '.png';
+}
+
+//Descr: Genera el Id para un dulce
+//p_column => Índice de la columna.
+//p_row => Índice de la fila.
+function generateCandyId(p_column, p_row){
+    return 'candy-C' + String(p_column) + 'R' + String(p_row);
+}
+
+//Descr: Obtiene el id de un dulce
+//p_candyObj => Objeto del DOM
+function getCandyId(p_candyObj){
+    return p_candyObj.attr('id');
+}
+
+//Descr: Devuelve el nombre del dulce
+//p_imgDOM => Objeto del DOM que contiene la imágen del dulce.
+function getCandyName(p_column, p_row){
+    var w_candy = getCandy(p_column, p_row);
+    return w_candy.attr('data-candy');
+}
+
+//Descr: Devuelve el objeto del dom con el dulce
+function getCandy(p_column, p_row){
+    var w_id = '#' + generateCandyId(p_column, p_row);
+    return $(w_id);
+}
+
+//Descr. Devuelve información sobre el dulce
+//p_candy => Objeto del DOM
+function getCandyData(p_candy){ 
     return {
+        id: p_candy.attr('id'),
+        element: p_candy.attr('data-candy'),
         row: Number(p_candy.attr('data-row')),
         column: Number(p_candy.attr('data-col'))        
     }
 }
 
-//Descr: Inicia la animación que muestra la aliminación de un dulce.
-function startRemoveCandyAnimation(p_array){    
-    var w_candy = null;
+function addCandyToColumn(p_column, p_row){
+    var w_candy = generateCandyElement();
+    var w_colDOM = null;
     var w_id = '';
 
-    if(p_array.length == 0)
-        return;    
-    
-    _onFadeToggleAnimation = {};
-    while(p_array.length > 0){
-        w_candy = p_array.pop();
-        w_id = getCandyId(w_candy);
-        _onFadeToggleAnimation[w_id] = w_candy;
-       
-        removeCandyAnimationToggle(w_candy, 0, 4);
-    }    
+    //Le asigno el id al dulce
+    w_id = generateCandyId(p_column, p_row);
+    w_candy.attr({
+        'id': w_id,
+        'data-row': p_row,
+        'data-col': p_column
+    });    
+
+    w_colDOM = getColumn(p_column);
+    w_colDOM.append(w_candy);    
+
+    return w_candy;
+}
+//========Fin Dulces======
+
+//Descr: Se calculan los puntos obtenidos por la combinación
+//Se usa una fórmula secilla. 
+function calculatePoints(p_combinationSize){
+    var w_minPoints = 10;
+    var w_rem = Math.ceil(p_combinationSize / _minCombinationSize);
+    var w_points = w_minPoints * w_rem;
+    var w_score = Number($('#score-text').html()) + w_points;
+
+    $('#score-text').html(w_score);
 }
 
-//Descr: Cambia la visibilidad de un dulce
-function removeCandyAnimationToggle(p_candyObj, p_count, p_max){
-    var w_id = '', w_idPrevius = '';
-    var w_candy = null;
-    var w_row = 0, w_col = 0;
+//Decr: Devuelve un entero entre 0 y p_max - 1.
+//p_max => Límite máximo
+function rollDice(p_max){
+    return (Math.floor(Math.random() * p_max));
+ }
 
-    p_candyObj.fadeToggle(100, 'linear', function(){
-        if(p_count < p_max){           
-            w_id = getCandyId(p_candyObj); 
-            p_candyObj.remove();   
-            delete _onFadeToggleAnimation[w_id];
+//==========Grilla========
+//Descr: Inicializa la grilla
+function initGrid(){
+    var w_col = 0, w_row = 0;   
 
-            if(Object.keys(_onFadeToggleAnimation).length == 0){
-               setTimeout(function(){ refillGrid(); }, 500);
-            }
+    clearGrid();
+    for(var w_col = 1; w_col <= _maxColumns; w_col++){        
+        for(var w_row = _maxRows; w_row > 0; w_row--){
+            addCandyToColumn(w_col, w_row);
+        }   
+    }
+
+    _combinationTimerId = setInterval(scanCombinations, 300);
+    _refillTimerId = setInterval(refillGrid, 500);
+}
+
+//Descr: Limpia la grilla
+function clearGrid(){
+    $('div[class^="col-"').html('');
+}
+
+//Descr: Genera dulces para completar la grilla
+//en los espacios vacíos
+function refillGrid(){
+    var w_col = 0, w_difference = 0;
+    var w_candy = null, w_colDOM = null;
+    var w_array = [], w_arrayImg = [];
+    
+    try{
+        if(_lock || $('img[id^=candy-]').length  == _maxColumns * _maxRows)
             return;
-        }
-        p_count++;
-        removeCandyAnimationToggle(p_candyObj, p_count, p_max);
+
+        _lock = true;
+        for(w_col = 1; w_col <= _maxColumns; w_col++){
+
+            //Me fijo si se eliminaron dulces de esta columna 
+            w_colDOM = $('.col-' + w_col);
+            w_arrayImg = w_colDOM.find('img');
+            //Me fijo si la columna está "llena" de dulces
+            w_difference = Math.abs(w_arrayImg.length - _maxRows);
+            if(w_difference === 0)
+                continue;
+            
+            while(w_difference > 0){                                
+                w_candy = addCandyToColumn(w_col, w_difference);
+                w_candy.hide();
+                w_array.push(w_candy);
+                w_difference--;
+            }
+        } 
+        
+        dropCandyArray(w_array);     
+    }catch(ex){
+        clearInterval(_refillTimerId);
+        alert(ex.message);
+    }
+}
+
+//Descr: Obtiene la columna, es decir, el elemento del DOM.
+//p_column => Índice de la columna.
+function getColumn(p_column){
+    var w_col = 'div.col-' + String(p_column);
+    return $(w_col);
+}
+
+//Descr: Refresca la información de los objetos de la grilla
+function refreshGridData(){
+    for(var w_col = 1; w_col <= _maxColumns; w_col++)
+        refreshColumnData(w_col);
+}
+
+//Descr: Refresca los datos de los elementos de una columna
+function refreshColumnData(p_column, p_ColumnElement){
+    //Actualizo los datos de los dulces
+    var w_id = '';
+    var w_row = _maxRows;
+    var w_columnElement = getColumn(p_column);
+    var w_arrayImg = w_columnElement.find('img');
+    $.each(w_arrayImg, function(index, element){
+        w_id = generateCandyId(p_column, w_row);
+        $(element).attr({
+            'id': w_id,
+            'data-row': w_row,
+            'data-col': p_column
+        });                    
+        
+        addDragAnimation($(element));
+        w_row--;
     });
 }
-//==========Fin Animaciones de desaparición de dulce========
+
+//========Fin Grilla======
 
 //============Combinaciones de dulces==========
 //Descr: Busca y elimina combinaciones. Además devuleve un bool
@@ -308,12 +252,13 @@ function removeCandyAnimationToggle(p_candyObj, p_count, p_max){
 function scanCombinations(){
     var w_col = 0, w_row = 0, w_value = 0, w_horizontalSize = 0, w_verticalSize = 0, w_combinationSize = 0;
     var w_left = {}, w_right = {}, w_up = {}, w_down = {};
-    var w_existCombination = false;
     var w_candy = null;
     var w_array = [];
 
-
     try{
+        if($('img[id^=candy-]').length  != _maxColumns * _maxRows)
+            return;
+
         for(w_col = 1; w_col <= _maxColumns; w_col++){
             for(w_row = 1; w_row <= _maxRows; w_row++){
                 w_value = getCandyName(w_col, w_row);
@@ -326,6 +271,7 @@ function scanCombinations(){
 
                 //Busco hacia arriba
                 w_up = scanUp(w_row, w_col, w_value);
+                //Busco hacia abajo
                 w_down = scanDown(w_row, w_col, w_value);
                 w_verticalSize = w_up.count + w_down.count + 1;
 
@@ -336,10 +282,14 @@ function scanCombinations(){
                     w_candy = getCandy(w_col, w_row);
 
                     w_array.push(w_candy);
-                    $.merge(w_array, w_left.array);
-                    $.merge(w_array, w_right.array);
-                    $.merge(w_array, w_up.array);
-                    $.merge(w_array, w_down.array);
+                    if(w_verticalSize >= _minCombinationSize){
+                        $.merge(w_array, w_left.array);
+                        $.merge(w_array, w_right.array);
+                    }
+                    if(w_horizontalSize >= _minCombinationSize){
+                        $.merge(w_array, w_up.array);
+                        $.merge(w_array, w_down.array);
+                    }
                     
                     calculatePoints(w_combinationSize);
                 }                
@@ -350,7 +300,8 @@ function scanCombinations(){
             startRemoveCandyAnimation(w_array);
                 
     }catch(ex){
-        alert(ex.message);
+        clearInterval(_combinationTimerId);
+        alert(ex.message);        
     } 
 }
 
@@ -402,7 +353,7 @@ function scanUp(p_startRow, p_column, p_element){
     var w_array = [];
     var w_candy = null;   
 
-    if(w_row == 1)
+    if(p_startRow == 1)
         return { count: 0, array: [] };
     
     for(w_row = p_startRow - 1; w_row > 0; w_row--){
@@ -423,7 +374,7 @@ function scanDown(p_startRow, p_column, p_element){
     var w_array = [];
     var w_candy = null;   
 
-    if(w_row == _maxRows)
+    if(p_startRow == _maxRows)
         return { count: 0, array: [] };
     
     for(w_row = p_startRow + 1; w_row <= _maxRows; w_row++){
@@ -438,232 +389,90 @@ function scanDown(p_startRow, p_column, p_element){
     return { count: w_count, array: w_array };
 }
 
-//Descr: Elimina combinaciones horizontales
-function removeHorizontalCombination(p_startColumn, p_startRow, p_offsetLeft, p_offsetRight){
-    var w_col = p_startColumn - 1, w_offset = 0;
+//============Combinaciones de dulces==========
+
+//============Animaciones de desaparición de dulce==========
+//Descr: Inicia la animación que muestra la aliminación de un dulce.
+function startRemoveCandyAnimation(p_array){    
     var w_candy = null;
-
-    w_offset = p_offsetLeft
-    while(w_offset > 0)
-    {
-        w_candy = getCandy(w_col, p_startRow);
-        startRemoveCandyAnimation(w_candy);
-        w_col--;
-        w_offset--;
-    }
-
-    w_col = p_startColumn + 1;
-    w_offset = p_offsetRight;
-    while(w_offset > 0){
-        w_candy = getCandy(w_col, p_startRow);
-        startRemoveCandyAnimation(w_candy);
-        w_col++;
-        w_offset--;
-    }
-}
-
-//Descr: Elimina combinaciones verticales
-function removeVerticalCombination(p_startColumn, p_startRow, p_offsetUp, p_offsetDown){
-    var w_row = p_startRow - 1, w_offset = 0;
-    var w_candy = null;
-
-    w_offset = p_offsetUp
-    while(w_offset > 0)
-    {
-        w_candy = getCandy(p_startColumn, w_row);
-        startRemoveCandyAnimation(w_candy);
-        w_row--;
-        w_offset--;
-    }
-
-    w_row = p_startRow + 1;
-    w_offset = p_offsetDown;
-    while(w_offset > 0){
-        w_candy = getCandy(p_startColumn, w_row);
-        startRemoveCandyAnimation(w_candy);
-        w_row++;
-        w_offset--;
-    }
-}
-
-//Descr: Se calculan los puntos obtenidos por la combinación
-//Se usa una fórmula secilla. 
-function calculatePoints(p_combinationSize){
-    var w_minPoints = 100;
-    var w_rem = Math.ceil(p_combinationSize / _minCombinationSize);
-    var w_points = w_minPoints * w_rem;
-    var w_score = Number($('#score-text').html()) + w_points;
-
-    $('#score-text').html(w_score);
-}
-//==========Fin Combinaciones de dulces========
-
-//Decr: Devuelve un entero entre 0 y p_max - 1.
-//p_max => Límite máximo
-function rollDice(p_max){
-    return (Math.floor(Math.random() * p_max));
- }
-
- //Genera un dulce. Valores posibles:
- //1.png, 2.png, 3.png, 4.png
-function generateCandy(){    
-    var w_candy = generateCandyItem();
-    var w_src = 'image/' + w_candy;
-    return $('<img />').attr({
-        'src': w_src,
-        'class': 'elemento',
-        'data-candy': w_candy
-    });
-}
-
- //Genera un dulce. Valores posibles:
- //1.png, 2.png, 3.png, 4.png
-function generateCandyItem(){
-    var w_idx = rollDice(4) + 1;
-    return String(w_idx) + '.png';
-}
-
-//Descr: Genera el Id para un dulce
-//p_column => Índice de la columna.
-//p_row => Índice de la fila.
-function generateId(p_column, p_row){
-    return 'candy-C' + String(p_column) + 'R' + String(p_row);
-}
-
-function getCandyId(p_candyObj){
-    return p_candyObj.attr('id');
-}
-
-//Descr: Obtiene la columna, es decir, el elemento del DOM.
-//p_column => Índice de la columna.
-function getColumn(p_column){
-    var w_col = 'div.col-' + String(p_column);
-    return $(w_col);
-}
-
-//Descr: Devuelve el nombre del dulce
-//p_imgDOM => Objeto del DOM que contiene la imágen del dulce.
-function getCandyName(p_column, p_row){
-    var w_candy = getCandy(p_column, p_row);
-    return w_candy.attr('data-candy');
-}
-
-//Descr: Setea el dulce de una celda
-function setCandy(p_candyObj, p_value){   
-    var w_src = 'image/' + p_value; 
-    return p_candyObj.attr({
-        src: w_src,
-        'data-candy': p_value 
-    });
-}
-
-//Descr: Devuelve el objeto del dom con el dulce
-function getCandy(p_column, p_row){
-    var w_id = '#' + generateId(p_column, p_row);
-    return $(w_id);
-}
-
-//Descr: Inicializa la grilla
-function initGrid(){
-    var w_col = 0, w_row = 0;
-    var w_candy = null, w_colDOM = null;
     var w_id = '';
-    var w_rowArray = [];
 
-    clearGrid();
-    for(var w_col = 1; w_col <= _maxColumns; w_col++){        
-        for(var w_row = _maxRows; w_row > 0; w_row--){
-            w_candy = generateCandy();
+    if(_lock || p_array.length == 0)
+        return;        
 
-            //Le asigno el id al dulce
-            w_id = generateId(w_col, w_row);
-            w_candy.attr({
-                'id': w_id,
-                'data-row': w_row,
-                'data-col': w_col
-            });
+    _lock = true;
+    _onFadeToggleAnimation = {};
+    while(p_array.length > 0){
+        w_candy = p_array.pop();
+        w_id = getCandyId(w_candy);
+        _onFadeToggleAnimation[w_id] = w_candy;
+       
+        removeCandyAnimationToggle(w_candy, 0, 2);
+    }    
+}
 
+//Descr: Cambia la visibilidad de un dulce
+function removeCandyAnimationToggle(p_candyObj, p_count, p_max){
+    var w_id = '';
+
+    if(p_candyObj.is(':animated'))
+        return;
+    p_candyObj.fadeToggle(300, 'linear', function(){
+        if(p_count == p_max){           
+            w_id = getCandyId(p_candyObj); 
+            p_candyObj.remove();   
+            delete _onFadeToggleAnimation[w_id];
+
+            if(Object.keys(_onFadeToggleAnimation).length == 0)
+                _lock = false;  
             
-            w_colDOM = getColumn(w_col);
-            w_colDOM.append(w_candy);
-
-            addDragAnimation(w_candy);
-
-             
-        }   
-    }
-    scanCombinations();
-}
-
-//Descr: Genera dulces para completar la grilla
-//en los espacios vacíos
-function refillGrid(){
-    var w_col = 0, w_row = 0, w_max = 0, w_offset = 0;
-    var w_candy = null, w_colDOM = null;
-    var w_candyItem = '', w_id = '';
-    var w_array = [];    
-    
-    for(w_col = 1; w_col <= _maxColumns; w_col++){       
-        //Me fijo si se eliminaron dulces de esta columna 
-        w_colDOM = $('.col-' + w_col);
-        w_array = w_colDOM.find('img:visible');        
-        if(w_array.length == _maxRows)
-            continue;
-
-        //Actualizo el estado de los elementos que quedan
-        w_array = $.makeArray(w_array).reverse();
-        w_row = _maxRows;
-        $.each(w_array, function(i, element){        
-            w_candy = $(element);
-            w_id = generateId(w_col, w_row);
-            w_candy.attr({
-                'id': w_id,
-                'data-row': w_row,
-                'data-col': w_col
-            });           
-            w_row--;
-        });
-
-        //Genero nuevos dulces
-        w_max = _maxRows - w_array.length;
-        w_offset = w_max;
-        w_array = [];
-        for(w_row = w_max; w_row > 0; w_row--){
-            w_candy = generateCandy();
-
-            //Le asigno el id al dulce
-            w_id = generateId(w_col, w_row);
-            w_candy.attr({
-                'id': w_id,
-                'data-row': w_row,
-                'data-col': w_col
-            });
-
-            w_colDOM = getColumn(w_col);
-            w_array.push(w_candy);            
-            w_offset--;
+            return;
         }
-
-        w_array = w_array.reverse();
-        dropCandyArray(w_array, w_colDOM);
-    }
-
-    //setTimeout(function(){ scanCombinations(); }, 1000);
-    setTimeout(function(){ scanCombinations(); }, (300 * w_max));
+        p_count++;
+        removeCandyAnimationToggle(p_candyObj, p_count, p_max);
+    });
 }
+//==========Fin Animaciones de desaparición de dulce========
 
-//Descr: Limpia la grilla
-function clearGrid(){
-    $('div[class^="col-"').html('');
-}
-
+//==========Eventos========
 //Descr: Inicia o reinicia el juego
 function startGame(){    
-    try{
+    try{        
+        if($('.btn-reinicio').html() === 'Reiniciar'){            
+            if(!$('.panel-tablero').is(':visible'))
+                restoreView();
+            else
+                stopGame();
+        }else{
+            _width1 = $('.panel-tablero').width();
+            _width2 = $('.panel-score').width();
+        }
+
+        $('#timer').html('02:00');
+
         $('.btn-reinicio').html('Reiniciar');
         $('#score-text').html(0);
         $('#movimientos-text').html(0);
-        initGrid();  
+        initGrid();
+        startTimer();
+    }catch(ex){
+        alert(ex.message);
+    }
+}
+
+//Descr: detiene la partida
+function stopGame(){
+    try {
+        clearInterval(_clockId);
+        clearInterval(_combinationTimerId);
+        clearInterval(_refillTimerId);
+        
+        $('.btn-reinicio').html('Reiniciar');        
+        $('#timer').html('02:00');
+
+        clearGrid();
+
+        showScore();
     }catch(ex){
         alert(ex.message);
     }
@@ -677,3 +486,135 @@ $(document).ready(function(){
         alert(ex.message);
     }
 });
+//========Fin Eventos======
+
+//========Drag animation======
+var _left = 0, _top = 0;
+function addDragAnimation(p_candy){
+    p_candy.draggable({
+        distance: 10,
+        drag: function(event,ui){
+            var w_swapCandy = null;
+            var w_data = getCandyData(p_candy);
+            var w_top = Math.abs(ui.position.top);
+            var w_left = Math.abs(ui.position.left);            
+            var w_metadata = {};
+            var w_direction = '';
+
+            if(Math.max(w_top, w_left) == w_left){
+                if(ui.position.left > 0){
+                    w_direction = 'right';
+                    w_swapCandy = generateCandyId(w_data.column + 1, w_data.row);                    
+                    w_metadata.dest = { id: w_swapCandy, column: w_data.column + 1, row: w_data.row};
+                } else {
+                    w_direction = 'left';
+                    w_swapCandy = generateCandyId(w_data.column - 1, w_data.row);
+                    w_metadata.dest = { id: w_swapCandy, column: w_data.column - 1, row: w_data.row};
+                }
+            } else {
+                if(ui.position.top < 0){
+                    w_direction = 'up';
+                    w_swapCandy = generateCandyId(w_data.column, w_data.row + 1);
+                    w_metadata = { id: w_swapCandy, column: w_data.column, row: w_data.row + 1 };
+                } else {
+                    w_direction = 'down';
+                    w_swapCandy = generateCandyId(w_data.column, w_data.row - 1);
+                    w_metadata = { id: w_swapCandy, column: w_data.column, row: w_data.row - 1};
+                }
+            }
+
+            _lock = true;
+            swap($(ui.helper), w_swapCandy, '0.5', 1000, function() {                 
+                var w_source =  $(ui.helper);
+                var w_target = $('#' + w_swapCandy);
+                var w_id = w_source.attr('id'), w_col = w_source.attr('data-col');
+                var w_row = w_source.attr('data-row');
+                var w_total = Number($('#movimientos-text').html());
+
+                $('#movimientos-text').html(w_total + 1);
+
+                //w_source.css('position', '');
+                //w_target.css('position', '');
+                w_source.attr({
+                    'id': w_target.attr('id'),
+                    'data-col': w_target.attr('data-col'),
+                    'data-row': w_target.attr('data-row')
+                });
+
+                w_target.attr({
+                    'id': w_id,
+                    'data-col': w_col,
+                    'data-row': w_row
+                });
+
+                
+                _lock = false;
+            });            
+
+            event.preventDefault();
+        }
+    });
+    
+}
+//======Fin Drag animation====
+
+
+//========Temporizador======
+function startTimer(){
+    _clockId = setInterval(function(){ tick(); }, 1000);
+}
+
+//Descr: Se ejecuta cada 1 seg y decrementa el contador
+function tick(){
+    var w_time = $('#timer').html().split(':');
+    var w_min = Number(w_time[0]);
+    var w_sec = Number(w_time[1]);
+
+    if(w_sec > 0){
+        w_sec--;        
+        //$('#timer').html('0' + w_min + ':' + w_sec);  
+    } else
+        w_sec = (w_min > 0) ? 59 : 0;
+
+    if(w_min === 0 && w_sec === 0){        
+        stopGame();
+        return; 
+    }
+    if(w_sec === 59)
+        w_min--;
+    w_sec = (w_sec < 10) ? '0' + w_sec : w_sec;
+    $('#timer').html('0' + w_min + ':' + w_sec);
+}
+//======Fin Temporizador====
+
+var _width1 = 0, _width2 = 0;
+function showScore(){
+    $('.panel-tablero').animate({
+        width: '-=' + $('.panel-tablero').width()
+    }, 500, function(){
+        $('.panel-tablero').hide();        
+    });    
+    
+    $('.panel-score').animate({
+        width: '+=' + ($(document).width() * 0.8),
+    }, 700, function(){
+        $('.time').hide();
+    });
+}
+
+function restoreView(){
+    $('.panel-tablero').show();
+    $('.panel-tablero').animate({
+        width: '+=' + _width1
+    }, 700, function(){
+    });    
+    
+    $('.panel-score').animate({
+        width: '-=' + ($(document).width() * 0.8),
+    }, 500, function(){
+        $('.panel-score').width(_width2);
+        $('.time').show();
+        $('#score-text').html(0);
+        $('#movimientos-text').html(0);
+    });
+}
