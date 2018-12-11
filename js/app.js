@@ -1,8 +1,9 @@
 'use strict';
 
 var _maxRows = 7, _maxColumns = 7, _minCombinationSize = 3, _maxDistance = 30;
-var _combinationTimerId = 0, _refillTimerId = 0, _clockId = 0;; 
-var _lock = false, _lockDrop = false;
+var _combinationTimerId = 0, _refillTimerId = 0, _clockId = 0;
+var _width1 = 0, _width2 = 0;
+var _lock = false;
 var _onFadeToggleAnimation = {};
 
 //============Animación del título==========
@@ -116,6 +117,8 @@ function getCandyData(p_candy){
     }
 }
 
+//Descr: Agrega un dulce en una determinada posición
+//de la grilla
 function addCandyToColumn(p_column, p_row){
     var w_candy = generateCandyElement();
     var w_colDOM = null;
@@ -437,7 +440,8 @@ function removeCandyAnimationToggle(p_candyObj, p_count, p_max){
 //==========Eventos========
 //Descr: Inicia o reinicia el juego
 function startGame(){    
-    try{        
+    try{       
+        _lock = false; 
         if($('.btn-reinicio').html() === 'Reiniciar'){            
             if(!$('.panel-tablero').is(':visible'))
                 restoreView();
@@ -463,6 +467,7 @@ function startGame(){
 //Descr: detiene la partida
 function stopGame(){
     try {
+        _lock = true;
         clearInterval(_clockId);
         clearInterval(_combinationTimerId);
         clearInterval(_refillTimerId);
@@ -498,58 +503,34 @@ function addDragAnimation(p_candy){
             var w_data = getCandyData(p_candy);
             var w_top = Math.abs(ui.position.top);
             var w_left = Math.abs(ui.position.left);            
-            var w_metadata = {};
-            var w_direction = '';
+            var w_metadata = {}, w_direction = {};
 
             if(Math.max(w_top, w_left) == w_left){
+                w_direction.orientation = 'horizontal';
                 if(ui.position.left > 0){
-                    w_direction = 'right';
-                    w_swapCandy = generateCandyId(w_data.column + 1, w_data.row);                    
+                    w_direction.direction = 'right';
+                    w_swapCandy = getCandy(w_data.column + 1, w_data.row);                    
                     w_metadata.dest = { id: w_swapCandy, column: w_data.column + 1, row: w_data.row};
                 } else {
-                    w_direction = 'left';
-                    w_swapCandy = generateCandyId(w_data.column - 1, w_data.row);
+                    w_direction.direction = 'left';
+                    w_swapCandy = getCandy(w_data.column - 1, w_data.row);
                     w_metadata.dest = { id: w_swapCandy, column: w_data.column - 1, row: w_data.row};
                 }
             } else {
+                w_direction.orientation = 'vertical';
                 if(ui.position.top < 0){
-                    w_direction = 'up';
-                    w_swapCandy = generateCandyId(w_data.column, w_data.row + 1);
+                    w_direction.direction = 'up';
+                    w_swapCandy = getCandy(w_data.column, w_data.row + 1);
                     w_metadata = { id: w_swapCandy, column: w_data.column, row: w_data.row + 1 };
                 } else {
-                    w_direction = 'down';
-                    w_swapCandy = generateCandyId(w_data.column, w_data.row - 1);
+                    w_direction.direction = 'down';
+                    w_swapCandy = getCandy(w_data.column, w_data.row - 1);
                     w_metadata = { id: w_swapCandy, column: w_data.column, row: w_data.row - 1};
                 }
             }
 
             _lock = true;
-            swap($(ui.helper), w_swapCandy, '0.5', 1000, function() {                 
-                var w_source =  $(ui.helper);
-                var w_target = $('#' + w_swapCandy);
-                var w_id = w_source.attr('id'), w_col = w_source.attr('data-col');
-                var w_row = w_source.attr('data-row');
-                var w_total = Number($('#movimientos-text').html());
-
-                $('#movimientos-text').html(w_total + 1);
-
-                //w_source.css('position', '');
-                //w_target.css('position', '');
-                w_source.attr({
-                    'id': w_target.attr('id'),
-                    'data-col': w_target.attr('data-col'),
-                    'data-row': w_target.attr('data-row')
-                });
-
-                w_target.attr({
-                    'id': w_id,
-                    'data-col': w_col,
-                    'data-row': w_row
-                });
-
-                
-                _lock = false;
-            });            
+            swap($(ui.helper), w_swapCandy, w_direction, function(){ _lock = false; });   
 
             event.preventDefault();
         }
@@ -587,7 +568,9 @@ function tick(){
 }
 //======Fin Temporizador====
 
-var _width1 = 0, _width2 = 0;
+//========Mostrar resultados======
+
+//Descr: Muestra la pantalla de resultados
 function showScore(){
     $('.panel-tablero').animate({
         width: '-=' + $('.panel-tablero').width()
@@ -602,6 +585,7 @@ function showScore(){
     });
 }
 
+//Descr: Reincia la vista para poder jugar otra partida
 function restoreView(){
     $('.panel-tablero').show();
     $('.panel-tablero').animate({
@@ -617,4 +601,90 @@ function restoreView(){
         $('#score-text').html(0);
         $('#movimientos-text').html(0);
     });
+}
+//======Fin Mostrar resultados====
+
+var _endAnimationSource = false, _endAnimationTarget = false;
+var _timerId = 0;
+function swap(p_source, p_target, p_direction, p_callback){
+    var w_sourcePos = p_source.position(), w_targetPos = p_target.position();
+    var w_offset = 0, w_speed = 500;
+    var w_sourceForward = {}, w_sourceBackward = {}, w_targetForward = {}, w_targetBackward = {};    
+    var w_valueSource = getCandyData(p_source).element, w_valueTarget = getCandyData(p_target).element;
+        
+    _endAnimationSource = false;
+    _endAnimationTarget = false;
+    //Determino en que dirección debo mover las fichas
+    if(p_direction.orientation === 'vertical'){
+        if(p_direction.direction === 'down'){ 
+            w_offset = Math.floor((w_targetPos.top - w_sourcePos.top) / 2);
+            w_sourceForward = { top: '+=' + w_offset };
+            w_sourceBackward = { top: '-=' + w_offset };
+            w_targetForward =  w_sourceBackward;
+            w_targetBackward = w_sourceForward;
+        } else {
+            w_offset = Math.floor((w_sourcePos.top - w_targetPos.top) / 2);
+            w_sourceForward = { top: '-=' + w_offset };
+            w_sourceBackward = { top: '+=' + w_offset };
+            w_targetForward = w_sourceBackward;
+            w_targetBackward = w_sourceForward;
+        }
+    } else {
+        if(p_direction.direction === 'left'){
+            w_offset = Math.floor((w_targetPos.left - w_sourcePos.left) / 2);
+            w_sourceForward = { left: '+=' + w_offset };
+            w_sourceBackward = { left: '-=' + w_offset };
+            w_targetForward = w_sourceBackward;
+            w_targetBackward = w_sourceForward;
+        } else {
+            w_offset = Math.floor((w_sourcePos.left - w_targetPos.left) / 2);
+            w_sourceForward = { left: '-=' + w_offset };
+            w_sourceBackward = { left: '+=' + w_offset };
+            w_targetForward = w_sourceBackward;
+            w_targetBackward = w_sourceForward;
+        }        
+    }
+
+    p_source.css('position', 'relative');
+    p_target.css('position', 'relative');
+
+    _timerId = setInterval(function(){
+        if(!_endAnimationSource || !_endAnimationTarget)
+            return;
+        
+        clearInterval(_timerId);
+        if(p_callback)
+            p_callback();
+    }, 200);
+   
+    p_source.animate(
+        w_sourceForward,
+        w_speed,
+        function(){
+            p_source.attr('data-candy', w_valueTarget);
+            p_source.attr('src', 'image/' + w_valueTarget);
+            p_source.animate(
+                w_sourceBackward,
+                w_speed,
+                function(){
+                    p_source.removeAttr('style');
+                    _endAnimationSource = true;
+        })
+    });
+
+    p_target.animate(
+        w_targetForward,
+        w_speed,
+        function(){
+            p_target.attr('data-candy', w_valueSource);
+            p_target.attr('src', 'image/' + w_valueSource);
+            p_target.animate(
+                w_targetBackward,
+                w_speed,
+                function(){
+                    p_target.removeAttr('style');
+                    _endAnimationTarget = true;
+        })
+    });
+
 }
