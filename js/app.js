@@ -2,9 +2,9 @@
 
 var _maxRows = 7, _maxColumns = 7, _minCombinationSize = 3, _maxDistance = 30;
 var _combinationTimerId = 0, _refillTimerId = 0, _clockId = 0;
-var _width1 = 0, _width2 = 0;
-var _lock = false;
+var _width1 = 0, _width2 = 0, _timerId = 0;
 var _onFadeToggleAnimation = {};
+var _lock = false, _endAnimationSource = false, _endAnimationTarget = false;
 
 //============Animación del título==========
 //Decr: Cambia el color del título a blanco
@@ -21,6 +21,170 @@ function titleAnimationYellow(){
     });
 }
 //==========Fin Animación del título========
+
+//========Swap de caramelos======
+//Descr: Dice si un elemento puede moverse a esa posición
+function canMove(p_column, p_row, p_element, p_direction){
+    var w_left = { count: 0, array: [] }, w_right = { count: 0, array: [] };
+    var w_up = { count: 0, array: [] }, w_down = { count: 0, array: [] };
+    var w_verticalSize = 0, w_horizontalSize = 0;
+    
+    switch(p_direction){
+        case 'left':
+            w_left = scanLeft(p_column, p_row, p_element);
+            w_up = scanUp(p_row, p_column, p_element);
+            w_down = scanDown(p_row, p_column, p_element);
+            break;
+        case 'right':
+            w_right = scanRight(p_column, p_row, p_element);
+            w_up = scanUp(p_row, p_column, p_element);
+            w_down = scanDown(p_row, p_column, p_element);
+            break;
+        case 'down':
+            w_left = scanLeft(p_column, p_row, p_element);
+            w_right = scanRight(p_column, p_row, p_element);
+            w_up = scanUp(p_row, p_column, p_element);
+            break;
+        default:
+            w_left = scanLeft(p_column, p_row, p_element);
+            w_right = scanRight(p_column, p_row, p_element);
+            w_down = scanDown(p_row, p_column, p_element);
+            break;
+
+    }
+    w_verticalSize = w_up.count + w_down.count + 1;
+    w_horizontalSize = w_left.count + w_right.count + 1;
+    console.log(Math.max(w_verticalSize, w_horizontalSize));
+ 
+    return Math.max(w_verticalSize, w_horizontalSize) >= _minCombinationSize;
+}
+
+//Descr: Cancela el intento de intercambio
+function cancelSwap(p_source, p_distance, p_direction, p_callback){
+    var w_forward = 15, w_backward = (15 + p_distance), w_speed = 500;
+    var w_sourceForward = {}, w_sourceBackward = {};    
+        
+    //Determino en que dirección debo mover las fichas
+    if(p_direction.orientation === 'vertical'){
+        if(p_direction.direction === 'down'){ 
+            w_sourceForward = { top: '+=' + w_forward };
+            w_sourceBackward = { top: '-=' + w_forward };
+        } else {
+            w_sourceForward = { top: '-=' + w_forward };
+            w_sourceBackward = { top: '+=' + w_forward };
+        }
+    } else {
+        if(p_direction.direction === 'right'){
+            w_sourceForward = { left: '+=' + w_forward };
+            w_sourceBackward = { left: '-=' + w_forward };
+        } else {
+            w_sourceForward = { left: '-=' + w_forward };
+            w_sourceBackward = { left: '+=' + w_forward };
+        }        
+    }
+    
+    p_source.css('position', 'relative');   
+    p_source.animate(
+        w_sourceForward,
+        w_speed,
+        function(){            
+            p_source.animate(
+                w_sourceBackward,
+                w_speed,
+                function(){
+        })
+    });
+}
+
+//Descr: Intercambia dos dulces
+function swap(p_source, p_target, p_direction, p_callback){
+    var w_sourcePos = p_source.position(), w_targetPos = p_target.position();
+    var w_offset = 0, w_speed = 500;
+    var w_sourceForward = {}, w_sourceBackward = {}, w_targetForward = {}, w_targetBackward = {};    
+    var w_valueSource = getCandyData(p_source).element, w_valueTarget = getCandyData(p_target).element;
+        
+    _endAnimationSource = false;
+    _endAnimationTarget = false;
+    //Determino en que dirección debo mover las fichas
+    if(p_direction.orientation === 'vertical'){
+        if(p_direction.direction === 'down'){ 
+            w_offset = Math.floor((w_targetPos.top - w_sourcePos.top) / 2);
+            w_sourceForward = { top: '+=' + w_offset };
+            w_sourceBackward = { top: '-=' + w_offset };
+            w_targetForward =  w_sourceBackward;
+            w_targetBackward = w_sourceForward;
+        } else {
+            w_offset = Math.floor((w_sourcePos.top - w_targetPos.top) / 2);
+            w_sourceForward = { top: '-=' + w_offset };
+            w_sourceBackward = { top: '+=' + w_offset };
+            w_targetForward = w_sourceBackward;
+            w_targetBackward = w_sourceForward;
+        }
+    } else {
+        if(p_direction.direction === 'right'){
+            w_offset = Math.floor((w_targetPos.left - w_sourcePos.left) / 2);
+            w_sourceForward = { left: '+=' + w_offset };
+            w_sourceBackward = { left: '-=' + w_offset };
+            w_targetForward = w_sourceBackward;
+            w_targetBackward = w_sourceForward;
+        } else {
+            w_offset = Math.floor((w_sourcePos.left - w_targetPos.left) / 2);
+            w_sourceForward = { left: '-=' + w_offset };
+            w_sourceBackward = { left: '+=' + w_offset };
+            w_targetForward = w_sourceBackward;
+            w_targetBackward = w_sourceForward;
+        }        
+    }
+    
+    p_source.css('position', 'relative');
+    p_source.css('z-index', '1000');
+
+    p_target.css('position', 'relative');
+    p_target.css('z-index', '500');
+
+    _timerId = setInterval(function(){
+        if(!_endAnimationSource || !_endAnimationTarget)
+            return;
+        
+        clearInterval(_timerId);
+        if(p_callback)
+            p_callback();
+    }, 200);
+   
+    p_source.animate(
+        w_sourceForward,
+        w_speed,
+        function(){
+            p_source.attr('data-candy', w_valueTarget);
+            p_source.attr('src', 'image/' + w_valueTarget);
+            p_source.css('z-index', '500');
+            p_source.animate(
+                w_sourceBackward,
+                w_speed,
+                function(){
+                    p_source.css('z-index', '');
+                    _endAnimationSource = true;
+        })
+    });
+
+    p_target.animate(
+        w_targetForward,
+        w_speed,
+        function(){
+            p_target.attr('data-candy', w_valueSource);
+            p_target.attr('src', 'image/' + w_valueSource);
+            p_target.css('z-index', '1000');
+            p_target.animate(
+                w_targetBackward,
+                w_speed,
+                function(){
+                    p_target.css('z-index', '');
+                    _endAnimationTarget = true;
+        })
+    });
+
+}
+//======Fin Swap de caramelos====
 
 //============Animaciones de movimiento de ficha==========
 //Descr: Lanza un dulce nuevo a la grilla
@@ -130,7 +294,8 @@ function addCandyToColumn(p_column, p_row){
         'id': w_id,
         'data-row': p_row,
         'data-col': p_column
-    });    
+    });   
+    w_candy.css('position', 'relative');
 
     w_colDOM = getColumn(p_column);
     w_colDOM.append(w_candy);    
@@ -277,21 +442,21 @@ function scanCombinations(){
                 //Busco hacia abajo
                 w_down = scanDown(w_row, w_col, w_value);
                 w_verticalSize = w_up.count + w_down.count + 1;
-
-                //Dulce actual
-                w_combinationSize = w_verticalSize + w_horizontalSize;
+                
                 if(Math.max(w_verticalSize, w_horizontalSize) >= _minCombinationSize){                   
-
+                    //Dulce actual
                     w_candy = getCandy(w_col, w_row);
-
                     w_array.push(w_candy);
+
                     if(w_verticalSize >= _minCombinationSize){
-                        $.merge(w_array, w_left.array);
-                        $.merge(w_array, w_right.array);
+                        w_combinationSize = w_verticalSize;
+                        $.merge(w_array, w_up.array);
+                        $.merge(w_array, w_down.array);                        
                     }
                     if(w_horizontalSize >= _minCombinationSize){
-                        $.merge(w_array, w_up.array);
-                        $.merge(w_array, w_down.array);
+                        w_combinationSize += w_horizontalSize;
+                        $.merge(w_array, w_left.array);
+                        $.merge(w_array, w_right.array);
                     }
                     
                     calculatePoints(w_combinationSize);
@@ -314,7 +479,7 @@ function scanLeft(p_startColumn, p_row, p_element){
     var w_array = []; 
     var w_candy = null;   
     
-    if(p_startColumn == 1)
+    if(p_startColumn <= 1)
         return { count: 0, array: [] };
     
     for(w_col = p_startColumn - 1; w_col > 0; w_col--){        
@@ -335,7 +500,7 @@ function scanRight(p_startColumn, p_row, p_element){
     var w_array = [];
     var w_candy = null;   
 
-    if(p_startColumn == _maxColumns)
+    if(p_startColumn >= _maxColumns)
         return { count: 0, array: [] };
     
     for(w_col = p_startColumn + 1; w_col <= _maxColumns; w_col++){        
@@ -356,7 +521,7 @@ function scanUp(p_startRow, p_column, p_element){
     var w_array = [];
     var w_candy = null;   
 
-    if(p_startRow == 1)
+    if(p_startRow <= 1)
         return { count: 0, array: [] };
     
     for(w_row = p_startRow - 1; w_row > 0; w_row--){
@@ -377,7 +542,7 @@ function scanDown(p_startRow, p_column, p_element){
     var w_array = [];
     var w_candy = null;   
 
-    if(p_startRow == _maxRows)
+    if(p_startRow >= _maxRows)
         return { count: 0, array: [] };
     
     for(w_row = p_startRow + 1; w_row <= _maxRows; w_row++){
@@ -442,7 +607,7 @@ function removeCandyAnimationToggle(p_candyObj, p_count, p_max){
 function startGame(){    
     try{       
         _lock = false; 
-        if($('.btn-reinicio').html() === 'Reiniciar'){            
+        if($('.btn-reinicio').html() === 'Reiniciar'){                        
             if(!$('.panel-tablero').is(':visible'))
                 restoreView();
             else
@@ -500,37 +665,47 @@ function addDragAnimation(p_candy){
         distance: 10,
         drag: function(event,ui){
             var w_swapCandy = null;
-            var w_data = getCandyData(p_candy);
+            var w_data = getCandyData(p_candy), w_dataTarget = {};
             var w_top = Math.abs(ui.position.top);
             var w_left = Math.abs(ui.position.left);            
             var w_metadata = {}, w_direction = {};
+            var w_canMoveSource = false, w_canMoveTarget = false;
 
             if(Math.max(w_top, w_left) == w_left){
                 w_direction.orientation = 'horizontal';
                 if(ui.position.left > 0){
                     w_direction.direction = 'right';
-                    w_swapCandy = getCandy(w_data.column + 1, w_data.row);                    
+                    w_canMoveSource = canMove(w_data.column + 1, w_data.row, w_data.element, w_direction.direction);
+                    w_swapCandy = getCandy(w_data.column + 1, w_data.row);
                     w_metadata.dest = { id: w_swapCandy, column: w_data.column + 1, row: w_data.row};
                 } else {
                     w_direction.direction = 'left';
+                    w_canMoveSource = canMove(w_data.column - 1, w_data.row, w_data.element, w_direction.direction);
                     w_swapCandy = getCandy(w_data.column - 1, w_data.row);
-                    w_metadata.dest = { id: w_swapCandy, column: w_data.column - 1, row: w_data.row};
+                     w_metadata.dest = { id: w_swapCandy, column: w_data.column - 1, row: w_data.row};
                 }
             } else {
                 w_direction.orientation = 'vertical';
                 if(ui.position.top < 0){
                     w_direction.direction = 'up';
+                    w_canMoveSource = canMove(w_data.column, w_data.row + 1, w_data.element, w_direction.direction);
                     w_swapCandy = getCandy(w_data.column, w_data.row + 1);
                     w_metadata = { id: w_swapCandy, column: w_data.column, row: w_data.row + 1 };
                 } else {
                     w_direction.direction = 'down';
+                    w_canMoveSource = canMove(w_data.column, w_data.row - 1, w_data.element, w_direction.direction);
                     w_swapCandy = getCandy(w_data.column, w_data.row - 1);
                     w_metadata = { id: w_swapCandy, column: w_data.column, row: w_data.row - 1};
                 }
             }
 
             _lock = true;
-            swap($(ui.helper), w_swapCandy, w_direction, function(){ _lock = false; });   
+            //Verifica si es posible el intercambio de dulces         
+            if(w_canMoveSource || w_canMoveTarget){
+                countMovement();
+                swap($(ui.helper), w_swapCandy, w_direction, function(){ _lock = false; });
+            }else 
+                cancelSwap($(ui.helper), 10, w_direction, function(){ _lock = false; })
 
             event.preventDefault();
         }
@@ -570,6 +745,14 @@ function tick(){
 
 //========Mostrar resultados======
 
+
+//Descr: Incrementa en uno el contador de movimientos
+function countMovement(){
+    var w_counterPanel = $('#movimientos-text');
+    var w_total = Number(w_counterPanel.html()) + 1;
+    w_counterPanel.html(w_total);
+}
+
 //Descr: Muestra la pantalla de resultados
 function showScore(){
     $('.panel-tablero').animate({
@@ -604,87 +787,4 @@ function restoreView(){
 }
 //======Fin Mostrar resultados====
 
-var _endAnimationSource = false, _endAnimationTarget = false;
-var _timerId = 0;
-function swap(p_source, p_target, p_direction, p_callback){
-    var w_sourcePos = p_source.position(), w_targetPos = p_target.position();
-    var w_offset = 0, w_speed = 500;
-    var w_sourceForward = {}, w_sourceBackward = {}, w_targetForward = {}, w_targetBackward = {};    
-    var w_valueSource = getCandyData(p_source).element, w_valueTarget = getCandyData(p_target).element;
-        
-    _endAnimationSource = false;
-    _endAnimationTarget = false;
-    //Determino en que dirección debo mover las fichas
-    if(p_direction.orientation === 'vertical'){
-        if(p_direction.direction === 'down'){ 
-            w_offset = Math.floor((w_targetPos.top - w_sourcePos.top) / 2);
-            w_sourceForward = { top: '+=' + w_offset };
-            w_sourceBackward = { top: '-=' + w_offset };
-            w_targetForward =  w_sourceBackward;
-            w_targetBackward = w_sourceForward;
-        } else {
-            w_offset = Math.floor((w_sourcePos.top - w_targetPos.top) / 2);
-            w_sourceForward = { top: '-=' + w_offset };
-            w_sourceBackward = { top: '+=' + w_offset };
-            w_targetForward = w_sourceBackward;
-            w_targetBackward = w_sourceForward;
-        }
-    } else {
-        if(p_direction.direction === 'left'){
-            w_offset = Math.floor((w_targetPos.left - w_sourcePos.left) / 2);
-            w_sourceForward = { left: '+=' + w_offset };
-            w_sourceBackward = { left: '-=' + w_offset };
-            w_targetForward = w_sourceBackward;
-            w_targetBackward = w_sourceForward;
-        } else {
-            w_offset = Math.floor((w_sourcePos.left - w_targetPos.left) / 2);
-            w_sourceForward = { left: '-=' + w_offset };
-            w_sourceBackward = { left: '+=' + w_offset };
-            w_targetForward = w_sourceBackward;
-            w_targetBackward = w_sourceForward;
-        }        
-    }
 
-    p_source.css('position', 'relative');
-    p_target.css('position', 'relative');
-
-    _timerId = setInterval(function(){
-        if(!_endAnimationSource || !_endAnimationTarget)
-            return;
-        
-        clearInterval(_timerId);
-        if(p_callback)
-            p_callback();
-    }, 200);
-   
-    p_source.animate(
-        w_sourceForward,
-        w_speed,
-        function(){
-            p_source.attr('data-candy', w_valueTarget);
-            p_source.attr('src', 'image/' + w_valueTarget);
-            p_source.animate(
-                w_sourceBackward,
-                w_speed,
-                function(){
-                    p_source.removeAttr('style');
-                    _endAnimationSource = true;
-        })
-    });
-
-    p_target.animate(
-        w_targetForward,
-        w_speed,
-        function(){
-            p_target.attr('data-candy', w_valueSource);
-            p_target.attr('src', 'image/' + w_valueSource);
-            p_target.animate(
-                w_targetBackward,
-                w_speed,
-                function(){
-                    p_target.removeAttr('style');
-                    _endAnimationTarget = true;
-        })
-    });
-
-}
